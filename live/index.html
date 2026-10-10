@@ -1,0 +1,110 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>live</title>
+<style>
+:root{--ar:0.5625}
+html,body{margin:0;background:#000;height:100%;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+#c,#hud{display:block;width:min(100vw,calc(100vh*var(--ar)));height:auto;aspect-ratio:var(--ar);margin:auto;position:absolute;inset:0}
+#hud{pointer-events:none}
+#hint{pointer-events:none;position:absolute;left:0;right:0;bottom:3vh;text-align:center;font:600 18px -apple-system,sans-serif;color:#fff;text-shadow:0 2px 6px #000;transition:opacity .4s}
+#dev{position:absolute;left:10px;bottom:8px;font:12px ui-monospace,Menlo,monospace;color:#fff;background:#0008;padding:5px 8px;border-radius:6px;opacity:.55;white-space:pre}
+#dev:hover{opacity:1}
+#flash{position:absolute;right:12px;bottom:10px;font:600 13px -apple-system,sans-serif;color:#9f9;background:#000a;padding:4px 10px;border-radius:6px;opacity:0;transition:opacity .6s}
+</style>
+</head><body><canvas id="c"></canvas><canvas id="hud"></canvas>
+<div id="hint">press any key or click to play — drag to drive, R restart</div>
+<div id="dev"></div><div id="flash">reloaded</div>
+<script>
+// LIVE PREVIEW (3D). three.js world on #c, Canvas2D HUD on #hud (both VW×VH view px from SIM.VIEW). Scripts load with a
+// cache-buster; the page polls its sources and reloads itself on change, keeping the play state (sessionStorage).
+// Attract demo until a key or click, then play. Dev keys: P pause, [ ] speed, . single step, Esc demo, R restart.
+// ?render=1 exposes window.__renderAt(t) (render.mjs) and window.__probe(name) (probe.mjs); ?ad=1 starts like the ad.
+const FILES = ['vendor/three.min.js', 'sim.js', 'kit.js', 'scene.js', 'hud.js', 'audio.js'];   // load order (the build reads this line)
+const V = Date.now(), STATIC = !!window.__STATIC__;
+const load = (src) => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src + (src.startsWith('vendor/') ? '' : '?v=' + V); s.onload = res; s.onerror = () => rej(new Error('failed ' + src)); document.head.appendChild(s); });
+(async () => {
+  if (!window.__INLINE__) { for (const f of FILES) await load(f); window.BUILD = await (await fetch('../tools/build.json?v=' + V)).json(); }
+  const q = new URLSearchParams(location.search), render = q.has('render');
+  const VW = SIM.VIEW.W, VH = SIM.VIEW.H;
+  document.documentElement.style.setProperty('--ar', VW / VH); if (SIM.HINT) document.getElementById('hint').textContent = SIM.HINT;
+  const cv = document.getElementById('c'), hud = document.getElementById('hud');
+  await SCENE.init(cv, hud, VW, VH);
+  const comp = document.createElement('canvas'); comp.width = VW; comp.height = VH;
+  window.__duration = SIM.L;
+  const grab = (type) => { const c = comp.getContext('2d'); c.drawImage(cv, 0, 0, VW, VH); c.drawImage(hud, 0, 0); return comp.toDataURL(type || 'image/png', 0.8); };   // same task as the render
+  window.__renderAt = (t) => { SCENE.render(t); return grab(); };
+  window.__probe = (name, shot) => { const st = SCENE.QA().find((s) => s[0] === name); SCENE.state = st[1]; SCENE.render(st[1].t); SCENE.state = null;
+    return Object.assign(SCENE.probe(), shot ? { shot: grab('image/jpeg') } : {}); };
+  window.__qaNames = () => SCENE.QA().map((s) => s[0]);
+  window.__ready = true;
+  if (render) return;
+
+  const keys = {}, hint = document.getElementById('hint'), dev = document.getElementById('dev'), flash = document.getElementById('flash');
+  const SPEEDS = [0.1, 0.25, 0.5, 1];
+  const AD = !!window.__AD__ || q.has('ad');
+  let play = null, acc = 0, simT = 0, speed = 1, paused = false, stepOnce = false, fps = 60;
+  try { const sv = JSON.parse(sessionStorage.getItem('live3d') || 'null');
+    if (sv && !AD) { simT = sv.simT; speed = sv.speed; paused = sv.paused; if (sv.play) { play = Object.assign(SIM.create(), sv.play); hint.style.opacity = 0; }
+      flash.style.opacity = 1; setTimeout(() => (flash.style.opacity = 0), 1200); } } catch (e) {}
+  if (AD) { play = SIM.spawn(0); hint.style.display = 'none'; }
+  const save = () => { try { sessionStorage.setItem('live3d', JSON.stringify({ simT, speed, paused, play })); } catch (e) {} };
+  addEventListener('keydown', (e) => {
+    const c = e.code;
+    if (c === 'KeyP') { paused = !paused; e.preventDefault(); return; }
+    if (c === 'Period') { stepOnce = true; paused = true; e.preventDefault(); return; }
+    if (c === 'BracketLeft') { speed = SPEEDS[Math.max(0, SPEEDS.indexOf(speed) - 1)]; return; }
+    if (c === 'BracketRight') { speed = SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(speed) + 1)]; return; }
+    if (c === 'Escape') { play = null; SCENE.state = null; hint.style.opacity = 1; return; }
+    keys[c] = 1;
+    if (!play || c === 'KeyR') { play = SIM.spawn(simT); hint.style.opacity = 0; }
+    e.preventDefault();
+  });
+  addEventListener('keyup', (e) => { keys[e.code] = 0; });
+  // pointer in view pixels (VW×VH); click is true for exactly one sim step
+  const ptr = { x: VW / 2, y: VH / 2, down: 0, click: 0 };
+  addEventListener('contextmenu', (e) => e.preventDefault());
+  const toView = (e) => { const r = hud.getBoundingClientRect(); ptr.x = (e.clientX - r.left) / r.width * VW; ptr.y = (e.clientY - r.top) / r.height * VH; };
+  addEventListener('pointermove', toView);
+  const hitAt = (x, y) => (SCENE.hit || []).find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+  addEventListener('pointerdown', (e) => { toView(e);
+    const b = hitAt(ptr.x, ptr.y);
+    if (b && b.id === 'cta') { (window.__openStore || (() => console.log('CTA → store')))(); return; }
+    if (b && b.id === 'replay') { play = SIM.spawn(simT); acc = 0; return; }
+    ptr.down = 1; ptr.click = 1; if (!play) { play = SIM.spawn(simT); hint.style.opacity = 0; } });
+  addEventListener('pointerup', () => { ptr.down = 0; });
+  let last = performance.now(), fpsAcc = 0, fpsN = 0;
+  const loop = () => {
+    const now = performance.now(), wall = Math.min(0.1, (now - last) / 1000); last = now;
+    fpsAcc += wall; fpsN++; if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; window.__fps = fps; }
+    const dt = paused ? (stepOnce ? 1 / 60 : 0) : wall * speed; stepOnce = false;
+    simT += dt;
+    if (play) {
+      acc += dt;
+      const inp = { left: keys.ArrowLeft || keys.KeyA, right: keys.ArrowRight || keys.KeyD, up: keys.ArrowUp || keys.KeyW, down: keys.ArrowDown || keys.KeyS,
+        jump: keys.Space, act: keys.KeyX || keys.KeyJ || keys.Enter, px: ptr.x, py: ptr.y, press: ptr.down, click: ptr.click };
+      while (acc >= SIM.DT) { SIM.step(play, inp); inp.click = ptr.click = 0; acc -= SIM.DT; }
+      if (SIM.outOfPlay && SIM.outOfPlay(play)) play = SIM.respawn ? SIM.respawn(play, simT) : SIM.spawn(simT);
+      SCENE.state = play;
+      if (window.AUDIO) AUDIO.tick(play);
+      if (play.end >= 0 && !play.endFired) { play.endFired = 1; if (window.__onEnd) window.__onEnd(); }   // networks that track completion
+    } else SCENE.state = null;
+    try { SCENE.render(simT); } catch (e) { if (!window.__renderErr) { window.__renderErr = e; console.error(e); } }   // log once, keep the loop alive
+    if (!STATIC) { const s = SCENE.stats(); dev.style.display = (paused || speed !== 1 || q.has('dev')) ? 'block' : 'none';
+      dev.textContent = `LIVE  ${play ? 'play' : 'demo'}  ${paused ? 'PAUSED' : speed + '×'}  ${fps.toFixed(0)} fps  ${s.calls} draws / ${(s.tris / 1000).toFixed(0)}k tris   P pause  [ ] speed  . step  Esc demo  R restart`; }
+    requestAnimationFrame(loop);
+  };
+  loop();
+  if (STATIC) { dev.style.display = 'none'; return; }
+  const WATCH = ['index.html', ...FILES.filter((f) => !f.startsWith('vendor/')), '../tools/build.json'], stamp = {};
+  const poll = async () => {
+    for (const f of WATCH) {
+      try { const r = await fetch(f + '?poll=' + Date.now(), { method: 'HEAD', cache: 'no-store' }); const m = r.headers.get('last-modified') + r.headers.get('content-length');
+        if (stamp[f] && stamp[f] !== m) { save(); location.reload(); return; } stamp[f] = m; } catch (e) {}
+    }
+    setTimeout(poll, 700);
+  };
+  poll();
+})().catch((e) => { console.error(e); document.body.insertAdjacentHTML('beforeend', '<pre style="color:#f88;position:absolute;top:0;left:0;background:#000c;padding:12px;font:13px monospace;white-space:pre-wrap">' + e.stack + '</pre>');
+  const f = ['scene.js', 'sim.js', 'kit.js', 'hud.js', 'index.html'], st = {};               // keep polling: fixing the error reloads by itself
+  setInterval(async () => { for (const x of f) { try { const r = await fetch(x + '?p=' + Date.now(), { method: 'HEAD', cache: 'no-store' }); const m = r.headers.get('last-modified');
+    if (st[x] && st[x] !== m) location.reload(); st[x] = m; } catch (e) {} } }, 800); });
+</script></body></html>

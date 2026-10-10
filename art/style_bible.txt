@@ -1,0 +1,6 @@
+Low-poly flat-shaded toy look (MeshLambert, flatShading), no textures except the HUD sprites; light from upper-left-front.
+Palette: cleared ground #9ccc5a (lighter than the mass), forest mass #245a22 / #4a9a36 / #6cb844, yard concrete #c9c2b2, pad #f2d43c.
+Hero machine #f6c21c body + #f4f4f0 roof + #d8382a cutter; rival #d8402e; tyres #262626 with #f2c21a hubs; logs #9a6334.
+Camera: perspective 42°, pitch ~53°, distance 23 m × 1.45/zoom; hero machine 18–24 % of the view height, slightly below centre.
+Light: hemisphere 1.25 (sky #eaf6ff / ground #4d6a2a) + sun 3.2 #fff1d6 with a 1024 shadow map (±9 m box following the camera).
+Exclusions: no realistic textures, no foreign logos or the reference's brand, no gore; HUD fonts Arial Black-class, white with dark outline.

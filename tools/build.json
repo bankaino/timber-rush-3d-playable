@@ -1,0 +1,20 @@
+{
+  "title": "Timber Rush",
+  "store": {
+    "android": "https://github.com/bankaino/timber-rush-3d-playable",
+    "ios": "https://github.com/bankaino/timber-rush-3d-playable"
+  },
+  "images": {
+    "coin": [
+      144,
+      "alpha"
+    ],
+    "hand": [
+      272,
+      "alpha"
+    ]
+  },
+  "models": {
+    "worker": "Worker by Quaternius, CC0 (poly.pizza/m/Yg2bQZO6Hj); clips Idle Run Sword_Slash Wave"
+  }
+}

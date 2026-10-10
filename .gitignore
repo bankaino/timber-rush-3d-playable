@@ -1,0 +1,10 @@
+dist/
+frames/
+art/raw/
+art/models_raw/
+art/logs/
+art/placeholder/
+study/ref/
+ref.png
+*.three.slim.js
+study/crops/

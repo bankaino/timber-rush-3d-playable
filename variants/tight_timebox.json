@@ -1,0 +1,2 @@
+{ "hypothesis": "Hard 25 s cap with cheaper upgrades: everyone reaches the endcard fast. Tests how much the endcard itself drives clicks.",
+  "K": { "END_MAX": 25, "END_AFTER_WIN": 0.9, "PAD_COST": [0, 120, 260, 999] } }
