@@ -4,8 +4,8 @@
     python tools/build_playable.py [--variant default|all] [--networks all|applovin,unity,...] [--out dist] [--pages docs]
 
 For every network it writes dist/<variant>/<network>.html (Google: a .zip with index.html) where everything is inline:
-three.js (tree-shaken to what the game uses by the skill's three_slim.mjs; --full-three ships vendor/three.min.js), the game modules (minified with the skill's esbuild when available), HUD images as WebP
-at the size the HUD draws them, GLB models as base64 (already meshopt-compressed by model.mjs), and the network's CTA /
+three.js (tree-shaken to what the game uses when the optional build helpers are available; otherwise the full vendor/three.min.js ships), the game modules (minified when esbuild is available), HUD images as WebP
+at the size the HUD draws them, GLB models as base64 (already meshopt-compressed), and the network's CTA /
 lifecycle adapter. Checks each file against the network's size limit and forbidden external requests and writes
 dist/<variant>/report.md with a size breakdown. Variants (A/B hypotheses) are JSON overrides of SIM.K in variants/.
 Module order comes from the FILES line in live/index.html; images/models/title/store from tools/build.json.
@@ -15,7 +15,14 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIVE = os.path.join(ROOT, 'live')
-SKILL = os.path.join(os.path.expanduser('~'), '.claude', 'skills', 'ref2playable3d')
+def _toolkit():
+    """optional build helpers (tree-shaker + minifier): TOOLKIT_DIR, else found next to the local tools; without them the build still works (full three.js, no minification)"""
+    d = os.environ.get('TOOLKIT_DIR')
+    if d: return d
+    import glob
+    hits = sorted(glob.glob(os.path.join(os.path.expanduser('~'), '.claude', 'skills', '*', 'scripts', 'three_slim.mjs')))
+    return os.path.dirname(os.path.dirname(hits[0])) if hits else ''
+SKILL = _toolkit()
 CFG = json.load(open(os.path.join(ROOT, 'tools', 'build.json'), encoding='utf-8'))
 STORE, TITLE = CFG['store'], CFG.get('title', 'Playable')
 
@@ -57,7 +64,7 @@ const src=fs.readFileSync(0,'utf8');process.stdout.write(e.transformSync(src,{mi
 
 
 def minify(src):
-    """esbuild from the skill (real minification, ~50% smaller); falls back to dropping comment lines."""
+    """esbuild when available (real minification, ~50% smaller); falls back to dropping comment lines."""
     if os.path.isdir(os.path.join(SKILL, 'node_modules', 'esbuild')):
         r = subprocess.run(['node', '-e', MINIFY, SKILL], input=src.encode('utf-8'), capture_output=True)
         if r.returncode == 0: return r.stdout.decode('utf-8')

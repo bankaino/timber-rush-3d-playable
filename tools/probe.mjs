@@ -1,11 +1,10 @@
 // probe.mjs — numbers instead of screenshots (run from the project root). Opens live/index.html?render=1 on a phone
 // viewport, renders every SCENE.QA() state and prints ONE line per state: draw calls, triangles, the hero's height in % of
 // the screen and whether it is fully on screen, HUD boxes off-screen / overlapping. Exit 1 on page errors or HUD faults.
-//   node <S>/scripts/probe.mjs [--w 390 --h 844] [--shots frames/probe]     (--shots also saves one PNG per state)
+//   node tools/probe.mjs [--w 390 --h 844] [--shots frames/probe]     (--shots also saves one PNG per state)
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import { createRequire } from 'node:module';
 const here = path.dirname(new URL(import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, '$1');
-const R2G = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'skills', 'ref2game', 'scripts');
-const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT || path.join(R2G, 'node_modules', 'playwright'));
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT || 'playwright');
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const root = process.cwd(), shots = opt('shots', '');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.glb': 'model/gltf-binary', '.webp': 'image/webp' };
