@@ -177,7 +177,7 @@
   S.probe = () => { const b = KIT.screenBox(cam, P.g, VW, VH), c = HUD.check();
     return { calls: R.info.render.calls, tris: R.info.render.triangles, hero: b, heroH: b ? +((b[3] - b[1]) / VH * 100).toFixed(1) : 0,
       heroOn: !!b && b[0] >= 0 && b[2] <= VW && b[1] >= 0 && b[3] <= VH, hudOut: c.out, hudOverlap: c.ov }; };
-  // QA states (staged from the attract replay where they happen naturally) — tools/probe and the critic use these
+  // QA states (staged from the attract replay where they happen naturally) — tools/probe uses these
   S.QA = () => { const at = (tt, o = {}) => Object.assign(JSON.parse(JSON.stringify(SIM.at(tt))), o);   // deep copy: SIM.at reuses its cache
     return [['start', at(0.3)], ['mow', at(4)], ['pad', at(7.7)], ['rival', at(16)], ['smash', at(21.6)], ['end', at(26)], ['money_worst', at(9, { money: 99999 })]]; };
 })();
